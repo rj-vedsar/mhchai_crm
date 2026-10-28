@@ -20,7 +20,7 @@ fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
 // Column Headers
 fputcsv($output, ['Item Name', 'Quantity', 'kg/Qty', 'Remarks']);
 
-// Database se query
+// Database se active items query
 $items = $action->db->sql("SELECT item_name FROM aimo_item WHERE deleteStatus = 0");
 
 if ($items) {

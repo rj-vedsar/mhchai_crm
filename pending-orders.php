@@ -46,17 +46,23 @@ if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOA
                 if (isset($itemMap[$nameKey])) {
                     $itemData = $itemMap[$nameKey];
                     
+                    // Quantity: CSV me hai to lo, varna blank
                     $qtyRaw = isset($row[1]) ? trim($row[1]) : '';
-                    $qty = (is_numeric($qtyRaw) && $qtyRaw > 0) ? floatval($qtyRaw) : ($qtyRaw !== '' ? $qtyRaw : '');
+                    $qty = $qtyRaw !== '' ? $qtyRaw : '';
 
+                    // kg/Qty: CSV me hai to lo, varna blank (DB se prefill nahi karna)
                     $kgRaw = isset($row[2]) ? trim($row[2]) : '';
-                    $kg = (is_numeric($kgRaw) && $kgRaw > 0) ? floatval($kgRaw) : floatval($itemData['item_qty']);
+                    $kg = $kgRaw !== '' ? $kgRaw : '';
+
+                    // Remarks: CSV me hai to lo, varna blank
+                    $rem = isset($row[3]) && trim($row[3]) !== '' ? trim($row[3]) : '';
 
                     $coupon = floatval($itemData['coupon_point'] ?? 0);
                     $wh = $itemData['warehouseid'] ?? '';
-                    $rem = !empty($row[3]) ? trim($row[3]) : ($itemData['remark'] ?? '');
 
-                    $numQty = is_numeric($qty) ? floatval($qty) : 0;
+                    $numQty = (is_numeric($qty) && floatval($qty) > 0) ? floatval($qty) : 0;
+                    $numKg = (is_numeric($kg) && floatval($kg) > 0) ? floatval($kg) : 0;
+
                     $uploaded_items[] = [
                         'item_id' => $itemData['id'],
                         'item_qty' => $qty,
@@ -64,7 +70,7 @@ if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOA
                         'item_coupon' => $coupon,
                         'warehouseid' => $wh,
                         'total_item_coupon' => $numQty * $coupon,
-                        'total_item_weight' => $numQty * $kg,
+                        'total_item_weight' => $numQty * $numKg,
                         'remark' => base64_encode($rem)
                     ];
                 }
