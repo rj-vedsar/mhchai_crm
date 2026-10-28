@@ -11,10 +11,69 @@ if ($action->db->validateGetData('id') && filter_var($action->db->validateGetDat
     $id = $action->db->validateGetData('id');
     $order_item = $action->db->sql("SELECT * FROM aimo_order WHERE id = $id");
 }
-print_r($_POST);
-print_r($_FILES);
-if(isset($_POST['order_upload'])){
 
+$uploaded_items = [];
+$upload_error = '';
+
+if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOAD_ERR_OK) {
+    $fileTmpPath = $_FILES['order_upload']['tmp_name'];
+    $fileName = $_FILES['order_upload']['name'];
+    $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+    if ($fileExt === 'csv') {
+        if (($handle = fopen($fileTmpPath, 'r')) !== FALSE) {
+            $bom = fread($handle, 3);
+            if ($bom !== "\xEF\xBB\xBF") {
+                rewind($handle);
+            }
+
+            // Skip Header
+            fgetcsv($handle);
+
+            $allItems = $action->db->sql("SELECT id, item_name, item_qty, coupon_point, warehouseid, remark FROM aimo_item WHERE deleteStatus = 0");
+            $itemMap = [];
+            if ($allItems) {
+                foreach ($allItems as $it) {
+                    $itemMap[strtolower(trim($it['item_name']))] = $it;
+                }
+            }
+
+            while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                if (empty($row[0])) continue;
+                $nameRaw = trim($row[0]);
+                $nameKey = strtolower($nameRaw);
+
+                if (isset($itemMap[$nameKey])) {
+                    $itemData = $itemMap[$nameKey];
+                    
+                    $qtyRaw = isset($row[1]) ? trim($row[1]) : '';
+                    $qty = (is_numeric($qtyRaw) && $qtyRaw > 0) ? floatval($qtyRaw) : ($qtyRaw !== '' ? $qtyRaw : '');
+
+                    $kgRaw = isset($row[2]) ? trim($row[2]) : '';
+                    $kg = (is_numeric($kgRaw) && $kgRaw > 0) ? floatval($kgRaw) : floatval($itemData['item_qty']);
+
+                    $coupon = floatval($itemData['coupon_point'] ?? 0);
+                    $wh = $itemData['warehouseid'] ?? '';
+                    $rem = !empty($row[3]) ? trim($row[3]) : ($itemData['remark'] ?? '');
+
+                    $numQty = is_numeric($qty) ? floatval($qty) : 0;
+                    $uploaded_items[] = [
+                        'item_id' => $itemData['id'],
+                        'item_qty' => $qty,
+                        'item_kg' => $kg,
+                        'item_coupon' => $coupon,
+                        'warehouseid' => $wh,
+                        'total_item_coupon' => $numQty * $coupon,
+                        'total_item_weight' => $numQty * $kg,
+                        'remark' => base64_encode($rem)
+                    ];
+                }
+            }
+            fclose($handle);
+        }
+    } else {
+        $upload_error = "Sirf CSV file upload karein.";
+    }
 }
 ?>
 
@@ -106,10 +165,10 @@ if(isset($_POST['order_upload'])){
             </ul>
 
             <div class="am-page-upr-btn">
-            <a href="./export-items.php" class="btn btn-dark">Download Items</a>
-            <form class="bg-white p-2 ms-2" method="post" enctype="multipart/form-data">
-                    <input type="file" name="order_upload" id="order_upload">
-                    <button type="submit" class="btn btn-primary">Upload</button>
+                <a href="./export-items.php" class="btn btn-dark">Download Items</a>
+                <form class="bg-white p-2 ms-2 d-inline-flex align-items-center" method="post" enctype="multipart/form-data">
+                    <input type="file" name="order_upload" id="order_upload" accept=".csv" required class="form-control form-control-sm me-2">
+                    <button type="submit" name="btn_order_upload" class="btn btn-primary btn-sm">Upload</button>
                 </form>
                 <div class="left-btn">
                     <div class="page-btn">
@@ -174,7 +233,7 @@ if(isset($_POST['order_upload'])){
                                 <div class="col-sm-1 col-12 d-flex align-items-center mb-3">
                                     <div class="btn">
                                         <?php if (isset($roleview['Party Management']) && in_array('Create', $roleview['Party Management'])){ ?><a href="#" class="btn btn-primary" data-bs-toggle="modal"
-                                            data-bs-target="#add-order"><i class="ti ti-circle-plus me-1"></i>Add </a><?php } ?>
+                                             data-bs-target="#add-order"><i class="ti ti-circle-plus me-1"></i>Add </a><?php } ?>
 
                                     </div>
                                 </div>
@@ -186,7 +245,7 @@ if(isset($_POST['order_upload'])){
                                             <input type="file" name="p_file" id="p_file" class="form-control">
                                              <?php if (!empty($order_item[0]['p_file'])){ ?>
                                             <img src="./upload/<?= @$order_item[0]['p_file']; ?>" alt="update image" style="max-height: 80px;"/>
-                                            <?php } ?>
+                                             <?php } ?>
                                         </div>
                                     </div>
                                 </div>
@@ -211,51 +270,53 @@ if(isset($_POST['order_upload'])){
                                                 </thead>
                                                 <tbody>
                                                     <?php
-                                                    if(isset($order_item) && $order_item){
-                                                        $decoded = json_decode($order_item[0]['item'], true);
-                                                        // echo "<pre>";
-                                                        // print_r($decoded);
-                                                        if($decoded){
-                                                            $sr = 1;
-                                                            foreach($decoded as $d){?>
-                                                            <tr>
-                                                                            <td><?= $sr++;?></td>
-            <td>
-                    <select name="item_id[]" class="select2 form-select item_id">
-                        <option value="">Select</option>
-                        <?php
-                             $fetchItemDropdown = $action->get_admin_function->fetchItemDropdown();
-                                if ($fetchItemDropdown) {
-                                 foreach ($fetchItemDropdown as $item) { ?>
-                                 <option <?= $item['id'] == $d['item_id'] ? 'selected':'';?> value="<?= $item['id']; ?>"><?= $item['item_name']; ?></option>
-                              <?php }
-                             } ?>
-                     </select>
-                         </td>
-                            <td>
-                               <input type="text" name="item_qty[]" class="form-control item_qty" placeholder="Enter quantity" value="<?= @$d['item_qty'];?>">
-                             </td>
-                          <td>
-                          <input type="text" name="item_kg[]" class="form-control item_kg" placeholder="Enter weight" value="<?= @$d['item_kg']; ?>">
-                          <input type="hidden" name="item_coupon[]" class="form-control item_coupon" value="<?= @$d['item_coupon']; ?>">
-                          <input type="hidden" name="warehouseid[]" class="form-control warehouseid" value="<?= @$d['warehouseid']; ?>">
-                          <input type="hidden" name="total_item_coupon[]" class="form-control total_item_coupon" value="<?= @$d['total_item_coupon']; ?>">
-                          <input type="hidden" name="total_item_weight[]" class="form-control total_item_weight" value="<?= @$d['total_item_weight']; ?>">
-                             </td>
-                                 <td>
-                                <textarea name="remark[]" id="remark" class="form-control" placeholder="Enter remark"><?= base64_decode($d['remark']); ?></textarea>
-                                </td>
-                                <td class="">
-                                      <a href="javascript:void(0);" class="barcode-delete-icon" onclick="deleteRow(this)">
-                                         <i class="fa-solid fa-xmark text-danger"></i>
-                                      </a>
-                                 </td>
-                                 </tr>
-                                 <?php }}} ?>
-                                    </tbody>
-                                 </table>
-                             </div>
-                                 <div class="col-sm-2 col-12 mb-3 mt-2">
+                                                    $render_rows = [];
+                                                    if (!empty($uploaded_items)) {
+                                                        $render_rows = $uploaded_items;
+                                                    } elseif (isset($order_item) && !empty($order_item[0]['item'])) {
+                                                        $render_rows = json_decode($order_item[0]['item'], true) ?: [];
+                                                    }
+
+                                                    if (!empty($render_rows)) {
+                                                        $sr = 1;
+                                                        $fetchItemDropdown = $action->get_admin_function->fetchItemDropdown();
+                                                        foreach ($render_rows as $d) { ?>
+                                                        <tr>
+                                                            <td><?= $sr++; ?></td>
+                                                            <td>
+                                                                <select name="item_id[]" class="select2 form-select item_id">
+                                                                    <option value="">Select</option>
+                                                                    <?php if ($fetchItemDropdown) {
+                                                                        foreach ($fetchItemDropdown as $item) { ?>
+                                                                            <option <?= $item['id'] == $d['item_id'] ? 'selected' : ''; ?> value="<?= $item['id']; ?>"><?= $item['item_name']; ?></option>
+                                                                        <?php }
+                                                                    } ?>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" name="item_qty[]" class="form-control item_qty" placeholder="Enter quantity" value="<?= @$d['item_qty']; ?>">
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" name="item_kg[]" class="form-control item_kg" placeholder="Enter weight" value="<?= @$d['item_kg']; ?>">
+                                                                <input type="hidden" name="item_coupon[]" class="form-control item_coupon" value="<?= @$d['item_coupon']; ?>">
+                                                                <input type="hidden" name="warehouseid[]" class="form-control warehouseid" value="<?= @$d['warehouseid']; ?>">
+                                                                <input type="hidden" name="total_item_coupon[]" class="form-control total_item_coupon" value="<?= @$d['total_item_coupon']; ?>">
+                                                                <input type="hidden" name="total_item_weight[]" class="form-control total_item_weight" value="<?= @$d['total_item_weight']; ?>">
+                                                            </td>
+                                                            <td>
+                                                                <textarea name="remark[]" id="remark" class="form-control" placeholder="Enter remark"><?= base64_decode(@$d['remark']); ?></textarea>
+                                                            </td>
+                                                            <td class="">
+                                                                <a href="javascript:void(0);" class="barcode-delete-icon" onclick="deleteRow(this)">
+                                                                    <i class="fa-solid fa-xmark text-danger"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    <?php } } ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="col-sm-2 col-12 mb-3 mt-2">
                                             <div>
                                                 <a href="#" class="btn btn-primary" id="addRow"><i class="ti ti-circle-plus me-1"></i>Add Item</a>
                                             </div>
@@ -401,7 +462,7 @@ if(isset($_POST['order_upload'])){
 require_once('./common/footer.php');
 ?>
 <?php 
-if(isset($id)){ } else{?> 
+if (isset($id) || !empty($uploaded_items)) { } else { ?> 
   <script>
     const button = document.getElementById('addRow');
 
@@ -415,7 +476,7 @@ if(isset($id)){ } else{?>
       }
     });
   </script>
-  <?php } ?>
+<?php } ?>
 
 
 <script>
@@ -447,7 +508,7 @@ if(isset($id)){ } else{?>
         });
     });
     $(document).on('input', '.item_qty, .item_kg', function () {
-        const item_id = $(this).closest('tr')
+        const item_id = $(this).closest('tr');
         const item_qty = parseFloat(item_id.find('.item_qty').val()) || 0;
         const item_kg = parseFloat(item_id.find('.item_kg').val()) || 0;
         const item_coupon = parseFloat(item_id.find('.item_coupon').val()) || 0;
@@ -520,8 +581,9 @@ if(isset($id)){ } else{?>
             }
         });
     }
-    <?php if(isset($order_item) && $order_item){?>
+    <?php if ((isset($order_item) && $order_item) || !empty($uploaded_items)) { ?>
         setTimeout(() => {
+            updateData();
             warehouseUpdate();
         }, 500);
     <?php } ?>
