@@ -11,9 +11,14 @@ if ($action->db->validateGetData('id') && filter_var($action->db->validateGetDat
     $id = $action->db->validateGetData('id');
     $order_item = $action->db->sql("SELECT * FROM aimo_order WHERE id = $id");
 }
+print_r($_POST);
+print_r($_FILES);
+if(isset($_POST['order_upload'])){
+
+}
 ?>
 
-<script>
+    <script>
     let rowCount = 1;
 
     function addRow() {
@@ -99,7 +104,13 @@ if ($action->db->validateGetData('id') && filter_var($action->db->validateGetDat
                             class="ti ti-chevron-up"></i></a>
                 </li>
             </ul>
+
             <div class="am-page-upr-btn">
+            <a href="./export-items.php" class="btn btn-dark">Download Items</a>
+            <form class="bg-white p-2 ms-2" method="post" enctype="multipart/form-data">
+                    <input type="file" name="order_upload" id="order_upload">
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
                 <div class="left-btn">
                     <div class="page-btn">
                         <?php if (isset($roleview['Order Management']) && in_array('View', $roleview['Order Management'])){ ?><a href="./pending-order-list.php" class="btn btn-info"><i class="fa-solid fa-list-ul me-1"></i>

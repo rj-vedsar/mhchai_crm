@@ -54,9 +54,9 @@ class Database
    */
   private function setDatabaseParameters()
   {
-    $this->username = ($this->httpHost === 'localhost' || $this->httpHost === 'siyoka.com' || $this->httpHost === '192.168.29.70') ? 'root' : 'mhchcrm_db';
-    $this->password = ($this->httpHost === 'localhost' || $this->httpHost === 'siyoka.com' || $this->httpHost === '192.168.29.70') ? '' : 'lygEBRmWhht9';
-    $this->dbname = ($this->httpHost === 'localhost' || $this->httpHost === 'siyoka.com' || $this->httpHost ===  '192.168.29.70') ? 'mhinv' : 'mhchcrm_db';
+    $this->username = $this->httpHost === 'localhost' ? 'root' : 'mhchcrm_db';
+    $this->password = $this->httpHost === 'localhost' ? '' : 'lygEBRmWhht9';
+    $this->dbname = $this->httpHost === 'localhost' ? 'mhinv' : 'mhchcrm_db';
   }
 
   /**
