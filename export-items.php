@@ -21,14 +21,14 @@ fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
 fputcsv($output, ['Item Name', 'Quantity', 'kg/Qty', 'Remarks']);
 
 // Database se active items query
-$items = $action->db->sql("SELECT item_name FROM aimo_item WHERE deleteStatus = 0");
+$items = $action->db->sql("SELECT item_name,item_qty FROM aimo_item WHERE deleteStatus = 0");
 
 if ($items) {
     foreach ($items as $ip) {
         fputcsv($output, [
             $ip['item_name'],
             '',
-            '',
+            $ip['item_qty'] ?? '',
             ''
         ]);
     }

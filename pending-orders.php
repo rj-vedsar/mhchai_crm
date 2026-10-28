@@ -116,7 +116,7 @@ if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOA
                     <input type="hidden" name="total_item_weight[]" class="form-control total_item_weight">
             </td>
             <td>
-                    <textarea name="remark[]" id="remark" class="form-control" placeholder="Enter remark"></textarea>
+                    <textarea name="remark[]" class="form-control remark" placeholder="Enter remark"></textarea>
             </td>
             <td class="">
                 <a href="javascript:void(0);" class="barcode-delete-icon" onclick="deleteRow(this)">
@@ -126,7 +126,7 @@ if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOA
         `;
 
         tableBody.appendChild(newRow);
-        $('.form-select').select2();
+        $(newRow).find('.select2').select2();
         rowCount++;
 
         updateSrNo();
@@ -310,7 +310,7 @@ if (isset($_FILES['order_upload']) && $_FILES['order_upload']['error'] === UPLOA
                                                                 <input type="hidden" name="total_item_weight[]" class="form-control total_item_weight" value="<?= @$d['total_item_weight']; ?>">
                                                             </td>
                                                             <td>
-                                                                <textarea name="remark[]" id="remark" class="form-control" placeholder="Enter remark"><?= base64_decode(@$d['remark']); ?></textarea>
+                                                                <textarea name="remark[]" class="form-control remark" placeholder="Enter remark"><?= base64_decode(@$d['remark'] ?? ''); ?></textarea>
                                                             </td>
                                                             <td class="">
                                                                 <a href="javascript:void(0);" class="barcode-delete-icon" onclick="deleteRow(this)">
@@ -494,6 +494,16 @@ if (isset($id) || !empty($uploaded_items)) { } else { ?>
         e.preventDefault();
         const item_id = $(this).val();
         const current = $(this).closest('tr');
+        if (!item_id) {
+            current.find('.item_kg').val('');
+            current.find('.remark').val('');
+            current.find('.item_coupon').val('');
+            current.find('.warehouseid').val('');
+            current.find('.total_item_coupon').val(0);
+            current.find('.total_item_weight').val(0);
+            updateData();
+            return;
+        }
         $.ajax({
             url: path_set,
             type: "POST",
@@ -505,10 +515,15 @@ if (isset($id) || !empty($uploaded_items)) { } else { ?>
                 if (res) {
                     const json = JSON.parse(res);
                     current.find('.item_kg').val(json.item_qty);
-                    current.find('.remark').html(json.remark);
+                    current.find('.remark').val(json.remark || '');
                     current.find('.item_coupon').val(json.coupon_point);
                     current.find('.warehouseid').val(json.warehouseid);
-                    warehouseUpdate();
+                    const qty = parseFloat(current.find('.item_qty').val()) || 0;
+                    const kg = parseFloat(json.item_qty) || 0;
+                    const coupon = parseFloat(json.coupon_point) || 0;
+                    current.find('.total_item_coupon').val(qty * coupon);
+                    current.find('.total_item_weight').val(qty * kg);
+                    updateData();
                 }
             }
         });
@@ -552,12 +567,10 @@ if (isset($id) || !empty($uploaded_items)) { } else { ?>
         }
         warehouseidElements.forEach((item) => {
             const warehouseId = item.value;
-            // Find the .total_item_weight within the same row (tr)
+            if (!warehouseId || warehouseId === '0') return;
             const weightElement = item.closest('tr').querySelector('.total_item_weight');
-            const weight = parseFloat(weightElement.value) || 0;
-            console.log(weight, 'WGTY');
+            const weight = parseFloat(weightElement ? weightElement.value : 0) || 0;
 
-            // Update the warehouse data
             if (warehouse[warehouseId]) {
                 warehouse[warehouseId] += weight;
             } else {
